@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Border-Watch Siren</title>
+<link rel="manifest" href="/api/live/siren/manifest.webmanifest">
+<meta name="theme-color" content="#0a0f16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BW Siren">
+<link rel="apple-touch-icon" href="/api/live/siren/icon-192.png">
+<link rel="icon" type="image/png" href="/api/live/siren/icon-192.png">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; background: #0a0f16; color: #e6edf3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top, 0px) 16px env(safe-area-inset-bottom, 0px);
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 16px 0 12px; border-bottom: 1px solid #1e2a38;
+  }
+  .brand { font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: #8aa0b6; }
+  .link { font-size: 12px; color: #8aa0b6; text-decoration: none; border: 1px solid #1e2a38;
+          padding: 6px 10px; border-radius: 6px; }
+  .conn { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #8aa0b6; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #55606c; }
+  .dot.up { background: #31c48d; box-shadow: 0 0 10px #31c48d; }
+
+  main { flex: 1; display: flex; flex-direction: column; align-items: center;
+         justify-content: center; text-align: center; gap: 22px; padding: 28px 0; }
+
+  .state { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: #8aa0b6; }
+  .headline { font-size: clamp(30px, 9vw, 54px); font-weight: 800; line-height: 1.05; margin: 0; }
+  .sub { font-size: clamp(15px, 4.2vw, 19px); color: #b6c6d6; max-width: 620px; margin: 0; line-height: 1.45; }
+  .meta { font-size: 13px; color: #7c8b9a; }
+
+  button {
+    font: inherit; font-weight: 700; border: 0; border-radius: 14px;
+    padding: 20px 34px; font-size: 19px; cursor: pointer; min-width: 240px;
+  }
+  .arm { background: #1f6feb; color: #fff; }
+  .silence { background: #30363d; color: #e6edf3; }
+  .link { background: none; color: #8aa0b6; font-size: 13px; padding: 10px;
+          min-width: 0; text-decoration: underline; font-weight: 500; }
+
+  /* Alarm state: the whole page becomes the indicator, so it reads across a
+     room from a phone lying on a table. */
+  body.alarm { background: #2b0b0b; animation: flash .7s steps(1) infinite; }
+  @keyframes flash { 50% { background: #7f1d1d; } }
+  body.alarm .headline { color: #fff; }
+  body.alarm .state { color: #ffb4b4; }
+
+  .badge { display: inline-block; padding: 5px 12px; border-radius: 999px;
+           font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+  .badge.CRITICAL { background: #b91c1c; color: #fff; }
+  .badge.HIGH { background: #c2410c; color: #fff; }
+
+  .log { border-top: 1px solid #1e2a38; padding: 12px 0 18px; max-height: 32vh; overflow-y: auto; }
+  .log h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+            color: #7c8b9a; margin: 0 0 10px; font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 7px 0;
+         border-bottom: 1px solid #141d28; font-size: 13px; }
+  .row:last-child { border-bottom: 0; }
+  .row time { color: #7c8b9a; font-variant-numeric: tabular-nums; flex: none; }
+  .row .what { color: #cdd9e5; }
+  .row .cam { color: #7c8b9a; flex: none; margin-left: auto; }
+  .empty { color: #7c8b9a; font-size: 13px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="brand">Border-Watch &middot; Post Siren</span>
+    <span class="conn"><span class="dot" id="dot"></span><span id="conn">connecting</span></span>
+  </header>
+
+  <main>
+    <div class="state" id="state">Siren disarmed</div>
+    <h1 class="headline" id="headline">Tap to arm</h1>
+    <p class="sub" id="sub">Browsers only allow sound after a tap. Arm once and this device will
+       sound automatically on every high-priority alert.</p>
+    <div id="badgeWrap"></div>
+    <button class="arm" id="armBtn">Arm siren</button>
+    <div class="meta" id="meta"></div>
+    <!-- Confirms this device can actually make a noise - volume up, not on
+         silent, audio unlocked - rather than discovering it cannot during a
+         real incident. -->
+    <button class="link" id="testBtn">Test siren sound</button>
+  </main>
+
+  <section class="log">
+    <h2>Recent alerts</h2>
+    <div id="log"><div class="empty">No alerts yet.</div></div>
+  </section>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const ALARM_SECONDS = 12;
+
+  let audio = null, armed = false, alarmTimer = null, osc = null, gain = null, wakeLock = null;
+  const alerts = [];
+
+  // --- siren tone -----------------------------------------------------------
+  // Synthesised rather than loaded from an audio file: no asset to ship, no
+  // download to fail, and it stays loud and recognisable on a phone speaker.
+  function startTone() {
+    if (!audio || osc) return;
+    osc = audio.createOscillator();
+    gain = audio.createGain();
+    osc.type = "sawtooth";
+    gain.gain.setValueAtTime(0.0001, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.9, audio.currentTime + 0.05);
+    osc.connect(gain).connect(audio.destination);
+
+    // Two-tone sweep, scheduled ahead so it keeps wailing without JS timers.
+    const t0 = audio.currentTime, step = 0.6;
+    osc.frequency.setValueAtTime(600, t0);
+    for (let i = 0; i < Math.ceil(ALARM_SECONDS / step) + 2; i++) {
+      const t = t0 + i * step;
+      osc.frequency.linearRampToValueAtTime(i % 2 ? 600 : 1100, t + step);
+    }
+    osc.start();
+  }
+
+  function stopTone() {
+    if (!osc) return;
+    try {
+      gain.gain.cancelScheduledValues(audio.currentTime);
+      gain.gain.setValueAtTime(gain.gain.value, audio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.12);
+      osc.stop(audio.currentTime + 0.15);
+    } catch (_) { /* already stopped */ }
+    osc = null; gain = null;
+  }
+
+  // --- alarm state ----------------------------------------------------------
+  function raiseAlarm(ev) {
+    document.body.classList.add("alarm");
+    $("state").textContent = ev.camera_name ? "Alert · " + ev.camera_name : "Alert";
+    $("headline").textContent = (ev.type || "ALERT").replace(/_/g, " ");
+    $("sub").textContent = ev.reason || "";
+    $("badgeWrap").innerHTML = '<span class="badge ' + (ev.severity || "HIGH") + '">'
+      + (ev.severity || "HIGH") + "</span>";
+    $("armBtn").textContent = "Silence";
+    $("armBtn").className = "silence";
+
+    startTone();
+    if (navigator.vibrate) navigator.vibrate([400, 180, 400, 180, 700]);
+    clearTimeout(alarmTimer);
+    alarmTimer = setTimeout(clearAlarm, ALARM_SECONDS * 1000);
+  }
+
+  function clearAlarm() {
+    clearTimeout(alarmTimer);
+    stopTone();
+    document.body.classList.remove("alarm");
+    $("badgeWrap").innerHTML = "";
+    $("armBtn").textContent = "Disarm";
+    $("armBtn").className = "silence";
+    setIdleText();
+  }
+
+  function setIdleText() {
+    if (!armed) return;
+    $("state").textContent = "Siren armed";
+    $("headline").textContent = "Monitoring";
+    $("sub").textContent = "This device will sound on any high-priority alert from Border-Watch.";
+  }
+
+  async function arm() {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    // The tap that armed us is what unlocks audio; resume() must happen inside
+    // that gesture or every later sound is silently blocked.
+    if (audio.state === "suspended") await audio.resume();
+    armed = true;
+    $("armBtn").textContent = "Disarm";
+    $("armBtn").className = "silence";
+    setIdleText();
+    // Best-effort: keep a phone propped up at the post from sleeping.
+    try { wakeLock = await navigator.wakeLock.request("screen"); } catch (_) { /* unsupported */ }
+  }
+
+  function disarm() {
+    armed = false;
+    clearAlarm();
+    $("state").textContent = "Siren disarmed";
+    $("headline").textContent = "Tap to arm";
+    $("sub").textContent = "Alerts will still be logged below, but this device will stay silent.";
+    $("armBtn").textContent = "Arm siren";
+    $("armBtn").className = "arm";
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+
+  $("testBtn").addEventListener("click", async () => {
+    // Arming and sounding share one unlock, so a successful test also
+    // leaves the device armed - it cannot pass and then stay silent.
+    if (!armed) await arm();
+    raiseAlarm({ type: "SIREN TEST", severity: "HIGH", camera_name: "Test",
+                 reason: "This is what a real alert sounds like on this device." });
+  });
+
+  $("armBtn").addEventListener("click", () => {
+    if (document.body.classList.contains("alarm")) { clearAlarm(); return; }
+    armed ? disarm() : arm();
+  });
+
+  // --- alert log ------------------------------------------------------------
+  function logAlert(ev) {
+    alerts.unshift(ev);
+    alerts.splice(25);
+    $("log").innerHTML = alerts.map((a) => {
+      const t = new Date((a.wall_time || Date.now() / 1000) * 1000)
+        .toLocaleTimeString([], { hour12: false });
+      return '<div class="row"><time>' + t + "</time>"
+        + '<span class="what">' + escapeHtml(a.reason || a.type) + "</span>"
+        + '<span class="cam">' + escapeHtml(a.camera_name || "") + "</span></div>";
+    }).join("");
+    $("meta").textContent = alerts.length + " alert" + (alerts.length === 1 ? "" : "s") + " this session";
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  }
+
+  // --- event feed -----------------------------------------------------------
+  let backfilling = true;
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(proto + "//" + location.host + "/api/live/ws/events");
+
+    ws.onopen = () => {
+      $("dot").classList.add("up");
+      $("conn").textContent = "connected";
+      // The server replays recent events on connect so a late-joining device
+      // has context. Those are history, not things happening now, so they are
+      // logged but must never sound the siren.
+      backfilling = true;
+      setTimeout(() => { backfilling = false; }, 1500);
+    };
+
+    ws.onmessage = (msg) => {
+      let ev;
+      try { ev = JSON.parse(msg.data); } catch (_) { return; }
+      if (!ev.alarm) return;          // server decides what is siren-worthy
+      logAlert(ev);
+      if (armed && !backfilling) raiseAlarm(ev);
+    };
+
+    const drop = () => {
+      $("dot").classList.remove("up");
+      $("conn").textContent = "reconnecting";
+      setTimeout(connect, 2000);      // a post siren must heal itself
+    };
+    ws.onclose = drop;
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+
+  // Registering the worker is what lets the browser offer "Install app" /
+  // "Add to Home Screen". Failure is non-fatal - the siren works as an
+  // ordinary page either way.
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/api/live/sw.js", { scope: "/api/live/" })
+      .catch(() => { /* http origin or unsupported browser; ignore */ });
+  }
+})();
+</script>
+</body>
+</html>

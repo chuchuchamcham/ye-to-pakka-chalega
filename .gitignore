@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node - at any depth (frontend/ and siren-app/ both have one)
+node_modules/
+frontend/dist/
+
+# Android build output and machine-specific SDK paths
+siren-app/android/build/
+siren-app/android/app/build/
+siren-app/android/.gradle/
+siren-app/android/local.properties
+siren-app/android/.idea/
+*.iml
+
+# Runtime / generated data (job outputs, uploads, per-job artifacts)
+jobs/
+outputs/
+uploads/
+references/
+zones/
+
+# Model weights (fetch separately, not source)
+models/
+
+# Editor / OS
+.claude/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Local-only helper deps (PDF generation)
+pylibs/
+
+# Dev TLS certificate (generated locally, never commit)
+certs/
+
+# Runtime state. Holds the token signing key, the password hashes and the
+# event database - publishing any of them would let anyone forge a session.
+# The directory is recreated on startup, so nothing here belongs in source.
+data/

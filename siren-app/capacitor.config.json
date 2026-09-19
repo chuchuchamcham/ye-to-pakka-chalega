@@ -1,0 +1,12 @@
+{
+  "appId": "in.borderwatch.siren",
+  "appName": "Border-Watch Siren",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}
