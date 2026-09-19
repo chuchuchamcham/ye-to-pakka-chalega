@@ -19,12 +19,17 @@ siren-app/android/.idea/
 # Runtime / generated data (job outputs, uploads, per-job artifacts)
 jobs/
 outputs/
-uploads/
 references/
 zones/
 
-# Model weights (fetch separately, not source)
-models/
+# Uploaded footage is runtime data, except the small demo clips the two
+# built-in cameras run on - without them a fresh clone has no cameras.
+uploads/*
+!uploads/smoke_*.mp4
+
+# Model weights are committed (46MB). They are small, they pin the exact
+# versions every measurement here was taken against, and a clone that has to
+# hunt down four model files from three projects is a clone that does not run.
 
 # Editor / OS
 .claude/
