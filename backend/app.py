@@ -57,10 +57,13 @@ logger = logging.getLogger("backend.app")
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Demo stand-in cameras start with the server so the live view has
-    # something in it immediately. Set BORDERWATCH_NO_DEMO_CAMERAS=1 for a
-    # deployment that should only ever show real registered cameras.
-    if not os.environ.get("BORDERWATCH_NO_DEMO_CAMERAS"):
+    # Live Monitor starts empty and shows only the cameras an operator has
+    # actually connected. A stand-in camera looping sample footage looks like
+    # a real feed, keeps analysis running, and raises alarms over whatever
+    # else someone is doing - including work in Forensic Analysis that has
+    # nothing to do with it. Set BORDERWATCH_DEMO_CAMERAS=1 to register the
+    # sample feed deliberately, for a rehearsal or a walkthrough.
+    if os.environ.get("BORDERWATCH_DEMO_CAMERAS"):
         seeded = seed_demo_cameras(UPLOADS_DIR)
         if seeded:
             logger.info("seeded %d demo camera(s): %s", len(seeded), ", ".join(c.name for c in seeded))

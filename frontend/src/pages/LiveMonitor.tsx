@@ -285,7 +285,10 @@ export function LiveMonitor() {
           <div className="flex flex-col gap-1">
             {cameras.length === 0 && (
               <div className="px-3 py-6 text-center text-[12px] text-text-tertiary">
-                No cameras registered.
+                No cameras connected.
+                <div className="mt-1 text-[11.5px]">
+                  Use Connect Device to add a phone, or Add camera for an RTSP feed.
+                </div>
               </div>
             )}
             {cameras.map((camera) => (

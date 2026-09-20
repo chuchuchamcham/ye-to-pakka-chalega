@@ -16,5 +16,6 @@ import os
 
 os.environ.setdefault("BORDERWATCH_DISABLE_AUTH", "1")
 # Demo cameras open video files and start capture threads; a test run should
-# not be doing that in the background.
-os.environ.setdefault("BORDERWATCH_NO_DEMO_CAMERAS", "1")
+# not be doing that in the background. They are opt-in, so this only has to
+# make sure nothing in the environment has switched them on.
+os.environ.pop("BORDERWATCH_DEMO_CAMERAS", None)

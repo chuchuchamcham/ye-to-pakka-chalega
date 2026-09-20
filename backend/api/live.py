@@ -78,9 +78,27 @@ def _status_frame(headline: str, detail: str, width: int = 960, height: int = 54
     return encoded
 
 
+def _source_missing(session) -> bool:
+    """Whether this camera's footage simply is not there.
+
+    Only meaningful for a file-backed camera: a URL or a phone that cannot be
+    reached is a connection problem, which may fix itself, while a file that
+    does not exist never will. Worth separating so the feed can say which.
+    """
+    source = session.camera.source
+    if source.startswith(PUSH_SCHEME) or "://" in source:
+        return False
+    return not Path(source).is_file()
+
+
 def _status_for(session) -> tuple[str, str]:
     """What to tell a viewer when no live frame is arriving."""
     status = session.status_dict()
+    # Checked before the error below, because a missing file surfaces as a
+    # capture failure whose message explains far less than saying plainly
+    # that there is nothing connected.
+    if _source_missing(session):
+        return "NO SIGNAL", "No footage is connected to this camera"
     if session.analysis_error:
         return "Analysis failed to start", str(session.analysis_error)[:70]
     if not status["running"]:
