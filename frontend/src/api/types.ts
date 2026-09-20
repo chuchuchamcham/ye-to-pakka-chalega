@@ -131,6 +131,10 @@ export interface JobSummary {
 export interface BwEvent {
   event_id?: string;
   type: string;
+  /** Stamped by the backend, which owns the decision about what matters. */
+  severity?: string;
+  /** Whether this event is alarm-worthy. The backend decides; the UI obeys. */
+  alarm?: boolean;
   track_id: number | null;
   frame_index: number;
   timestamp_sec: number;

@@ -26,13 +26,15 @@ import { Radar, Siren, VolumeX } from "lucide-react";
 import { playSiren, vibrateAlert } from "../lib/siren";
 import { alertsReachedBy, type PlaybackAlert } from "../lib/alertPlayback";
 
-// Findings worth interrupting someone for. Routine detections (a vehicle
-// seen, a plate located) are deliberately not in this set - an alert that
-// sounds for everything is one people learn to ignore.
-const ALERT_EVENT_TYPES = new Set([
-  "TARGET_CONFIRMED", "TARGET_REACQUIRED", "TARGET_ZONE_INTRUSION",
-  "TARGET_VEHICLE_FOUND", "TARGET_CROSS_CAMERA_MATCH",
-]);
+// Which findings are worth interrupting someone for is the backend's
+// decision - it stamps `alarm` from the severity each rule earned. This page
+// used to keep its own list of types instead, and the two drifted: a zone
+// crossing became CRITICAL and sounded the siren on a live camera while the
+// same crossing stayed silent here, because this list predated the change.
+// Following the stamp means a new alarm-worthy event works everywhere at once.
+function isAlertEvent(event: BwEvent): boolean {
+  return event.alarm === true;
+}
 
 // How long the on-screen alert banner stays up after the siren sounds.
 const ALERT_BANNER_MS = 5000;
@@ -88,7 +90,7 @@ export function Results() {
   // what they are being asked to look at.
   const alertEvents = useMemo(
     () => (events ?? [])
-      .filter((e) => ALERT_EVENT_TYPES.has(e.type))
+      .filter(isAlertEvent)
       .sort((a, b) => a.timestamp_sec - b.timestamp_sec),
     [events],
   );

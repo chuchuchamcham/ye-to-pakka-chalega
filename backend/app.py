@@ -40,6 +40,7 @@ from backend.api.storage import (
     NotFoundError, find_reference_photos, find_video_path, load_zone, new_id,
     save_reference_photos, save_uploaded_video, save_zone,
 )
+from backend.core.events import severity_for, should_alarm
 from backend.config import (
     AnprConfig, BehaviorConfig, EVIDENCE_DIR, LowLightConfig, OUTPUTS_DIR, PersonIDConfig,
     SFACE_MODEL_PATH, UPLOADS_DIR, YUNET_MODEL_PATH, YOLO_MODEL_PATH, ZoneConfig, detect_device,
@@ -338,12 +339,26 @@ def cancel_job(job_id: str):
 
 @app.get("/api/jobs/{job_id}/events")
 def get_job_events(job_id: str):
+    """A finished job's events, each carrying the severity its rule earned.
+
+    Live events are stamped with severity as they are emitted; forensic ones
+    were not, so anything consuming them had to keep its own opinion about
+    which types matter. Two lists of "what counts as an alarm" inevitably
+    drift - and did: raising a zone crossing to CRITICAL made the siren sound
+    on a live camera while the same crossing stayed silent in Forensic Mode,
+    because the page was still working from a hardcoded list that predated it.
+    Stamping severity here leaves one source of truth for both modes.
+    """
     job = job_manager.get(job_id)
     if job is None:
         raise HTTPException(404, f"job not found: {job_id}")
     if job.status != "done":
         raise HTTPException(409, f"job is not finished (status={job.status})")
-    return job.events
+    return [
+        {**event, "severity": severity_for(event), "alarm": should_alarm(
+            {**event, "severity": severity_for(event)})}
+        for event in job.events
+    ]
 
 
 @app.get("/api/jobs/{job_id}/output")

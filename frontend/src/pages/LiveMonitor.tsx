@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle, BellRing, Plus, Radio, RefreshCw, Settings2, Siren, Square, Wifi, WifiOff, X,
+  AlertTriangle, BellRing, Plus, Radio, RefreshCw, Settings2, Siren, Square, VolumeX, Wifi,
+  WifiOff, X,
 } from "lucide-react";
 import { Panel } from "../components/common/Panel";
 import { StatusBadge } from "../components/common/StatusBadge";
@@ -11,6 +12,7 @@ import { EvidencePanel } from "../components/live/EvidencePanel";
 import { eventMeta } from "../lib/eventMeta";
 import { liveApi, streamUrl, type LiveCamera, type LiveEvent } from "../api/live";
 import { useLiveEvents } from "../hooks/useLiveEvents";
+import { playSiren, vibrateAlert } from "../lib/siren";
 
 const STATUS_POLL_MS = 2000;
 
@@ -129,6 +131,24 @@ export function LiveMonitor() {
 
   const alarms = useMemo(() => events.filter((e) => e.alarm), [events]);
 
+  // Sound the siren here as well as on the dedicated siren page. The page was
+  // built to run on a separate device on the table, like a real border post,
+  // and it still does - but an operator watching this screen saw a red banner
+  // and a SIREN badge and heard nothing, which reads as an alarm that failed
+  // rather than one that was never meant to play here.
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const soundedAlarmRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!latestAlarm) return;
+    // Keyed on the event, so re-renders while a banner is up stay silent.
+    const key = latestAlarm.event_id ?? `${latestAlarm.type}@${latestAlarm.wall_time}`;
+    if (soundedAlarmRef.current === key) return;
+    soundedAlarmRef.current = key;
+    vibrateAlert();
+    void playSiren().then((played) => setAudioBlocked(!played));
+  }, [latestAlarm]);
+
   const healthSummary = useMemo(() => {
     const online = cameras.filter((c) => c.state === "online" && !c.degraded).length;
     return { online, problems: cameras.length - online };
@@ -180,6 +200,22 @@ export function LiveMonitor() {
         <div className="flex items-center gap-2 rounded border border-accent-red/35 bg-accent-red/10 px-4 py-3 text-[12.5px] text-accent-red">
           <AlertTriangle size={15} /> {error}
         </div>
+      )}
+
+      {/* Browsers refuse audio until the page has been interacted with, so a
+          silent alarm is indistinguishable from a broken one. Say which it is,
+          and offer the one click that fixes it. */}
+      {audioBlocked && (
+        <button
+          onClick={() => void playSiren().then((played) => setAudioBlocked(!played))}
+          className="flex w-full items-center gap-2.5 rounded border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-left text-[12.5px] text-accent-amber"
+        >
+          <VolumeX size={16} className="shrink-0" />
+          <span>
+            <b>Alert sound blocked</b> — your browser muted it. Click here to enable the siren
+            on this screen.
+          </span>
+        </button>
       )}
 
       {latestAlarm && (
