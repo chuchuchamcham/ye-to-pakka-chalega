@@ -69,14 +69,18 @@ class TrackerConfig:
     # re-running the model (see core.tracker.ObjectTracker). This is the
     # dominant cost in every pipeline (benchmarked ~75-90% of per-frame
     # time), so it's the highest-leverage performance knob in the system.
-    # Default is 3: A/B-benchmarked on a real 150-frame ANPR search video
-    # (uploads/smoke_anpr_test123.mp4) at 2.36x speedup (0.66 -> 1.56 FPS)
-    # with identical search accuracy (same plate, same 100% confidence),
-    # zero false LOST/REACQUIRED events, and a continuously stable red box
-    # once locked -- see scripts/benchmark_ab.py. Pass detection_stride=1
-    # explicitly (TrackerConfig(detection_stride=1)) for maximum-accuracy
-    # runs where every frame should be truly detected, not propagated.
-    detection_stride: int = 3
+    # Default is 5. It was 3, chosen when propagation between detections
+    # moved a box a whole stride's worth of motion per frame - so every extra
+    # frame skipped made the box visibly worse, and 3 was as far as it could
+    # be pushed. With velocity measured per frame (see core/tracker.py) the
+    # box tracks the object correctly whatever the stride, which makes the
+    # setting a pure speed choice again. Measured on the person_id smoke clip:
+    # 7.5 fps at stride 3, 11.7 at stride 5 - 56% faster, the same
+    # TARGET_CONFIRMED, and box jitter unchanged (0.83px mean vs 0.89px).
+    # Beyond 5 the returns flatten while the gaps keep growing. Pass
+    # detection_stride=1 explicitly for maximum-accuracy runs where every
+    # frame should be truly detected, not propagated.
+    detection_stride: int = 5
 
 
 @dataclass
