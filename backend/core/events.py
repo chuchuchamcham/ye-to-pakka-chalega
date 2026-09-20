@@ -26,6 +26,12 @@ EVENT_SEVERITY: dict[str, str] = {
     # the whole system exists to surface.
     "TARGET_ZONE_INTRUSION": CRITICAL,
     "TARGET_BEHAVIOR_ALERT": CRITICAL,
+    # Crossing into a restricted area is the incident a zone exists to catch,
+    # whether or not the person is a known target, so it sounds the siren on
+    # its own. ZONE_APPROACH below is the warning that precedes it and stays
+    # deliberately below alarm severity: something that has not happened yet
+    # must not be able to cry wolf.
+    "ZONE_ENTRY": CRITICAL,
     # A watched person or vehicle positively identified on camera.
     "TARGET_CONFIRMED": HIGH,
     "TARGET_REACQUIRED": HIGH,
@@ -34,7 +40,7 @@ EVENT_SEVERITY: dict[str, str] = {
     "TARGET_CROSS_CAMERA_MATCH": HIGH,
     "CAMERA_OFFLINE": HIGH,
     # Something worth an operator's attention, but not an alarm.
-    "ZONE_ENTRY": MEDIUM,
+    "ZONE_APPROACH": MEDIUM,
     "LONG_DWELL": MEDIUM,
     "LOITERING": MEDIUM,
     "PLATE_CONFIRMED": MEDIUM,
@@ -134,8 +140,12 @@ def describe_event(event: dict) -> str:
         if data.get("is_target"):
             return f"Confirmed target showed {trigger}"
         return f"{who} showed {trigger} inside {zone_label}"
+    if etype == "ZONE_APPROACH":
+        secs = num("eta_sec")
+        timing = f" within about {secs} seconds" if secs else " shortly"
+        return f"{who} is heading toward {zone_label} and is predicted to enter{timing}"
     if etype == "ZONE_ENTRY":
-        return f"{who} entered {zone_label}"
+        return f"{who} crossed into {zone_label}"
     if etype == "ZONE_EXIT":
         return f"{who} left {zone_label}"
     if etype == "LONG_DWELL":

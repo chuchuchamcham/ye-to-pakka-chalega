@@ -49,7 +49,7 @@ export function Login({ session, onSignedIn }: { session: SessionState; onSigned
         <div className="mb-6 text-center">
           <div className="mb-2 flex items-center justify-center gap-2 text-lg font-bold tracking-wide text-text-primary">
             <span className="h-2 w-2 rounded-full bg-accent-blue shadow-[0_0_8px_var(--color-accent-blue)]" />
-            BORDERWATCH
+            DRISHTI
           </div>
           <div className="text-[11px] tracking-[1.5px] text-text-tertiary">AI VIDEO INTELLIGENCE</div>
         </div>

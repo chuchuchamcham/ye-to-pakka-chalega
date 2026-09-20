@@ -36,7 +36,7 @@ export default function App() {
   if (session === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-0 text-[13px] text-text-tertiary">
-        Connecting to Border-Watch…
+        Connecting to Drishti…
       </div>
     );
   }

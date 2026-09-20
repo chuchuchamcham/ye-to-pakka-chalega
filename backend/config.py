@@ -227,6 +227,36 @@ class ZoneConfig:
     # How long an ENTRY/EXIT/LONG_DWELL banner stays on screen, in seconds.
     banner_display_sec: float = 2.0
 
+    # --- approach prediction (early warning before the boundary is crossed) ---
+    #
+    # A crossing alarm only ever tells an operator what has already happened.
+    # Extrapolating a track's recent motion gives them the seconds before it,
+    # which is the difference between responding and recording. All spatial
+    # values are in PIXELS of the processing resolution, like BehaviorConfig,
+    # so they are resolution-dependent by nature.
+    #
+    # How far ahead the straight-line prediction looks. Longer sees intent
+    # earlier but extrapolates further from real evidence, so it warns on
+    # paths that curve away; shorter warns only when entry is nearly certain.
+    approach_prediction_sec: float = 2.5
+    # Consecutive frames the prediction must agree before warning, the same
+    # debounce idea as entry_grace_frames. Low, because a warning is cheap and
+    # late warnings are worthless.
+    approach_grace_frames: int = 2
+    # Motion below this is tracker jitter, not approach. Without it a
+    # stationary person's box wobble extrapolates into a phantom approach.
+    approach_min_speed_px_per_sec: float = 12.0
+    # Baseline for measuring velocity. Spanning several frames rather than
+    # differencing consecutive ones keeps detector noise out of the heading -
+    # the same reason the tracker measures its own velocity over a span. It
+    # must also stay longer than the gap between analysed frames: live
+    # analysis on CPU delivers 1-3fps, so a window shorter than a second
+    # would never hold two samples to measure between.
+    approach_velocity_window_sec: float = 1.5
+    # Minimum gap before the same track can raise another approach warning.
+    # Someone working along a fence line should not re-warn every second.
+    approach_cooldown_sec: float = 20.0
+
 
 @dataclass
 class BehaviorConfig:

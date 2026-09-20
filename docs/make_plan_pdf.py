@@ -21,11 +21,11 @@ GREY_TXT = colors.HexColor("#3B3B3B")
 WHITE = colors.white
 
 doc = SimpleDocTemplate(
-    "BorderWatch_Round2_Plan.pdf",
+    "Drishti_Round2_Plan.pdf",
     pagesize=A4,
     leftMargin=14 * mm, rightMargin=14 * mm,
     topMargin=8 * mm, bottomMargin=8 * mm,
-    title="Border-Watch Round 2 Plan",
+    title="Drishti Round 2 Plan",
 )
 
 story = []

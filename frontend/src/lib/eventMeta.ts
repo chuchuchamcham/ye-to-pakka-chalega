@@ -1,6 +1,6 @@
 import {
-  AlertTriangle, Car, Clock, Crosshair, Eye, Footprints, Gauge, MapPin, MapPinOff,
-  ShieldAlert, Sparkles, TriangleAlert, type LucideIcon,
+  AlertTriangle, Car, Clock, Crosshair, Eye, Footprints, Gauge, MapPinOff,
+  Navigation, ShieldAlert, Sparkles, TriangleAlert, type LucideIcon,
 } from "lucide-react";
 
 export type Severity = "red" | "amber" | "green" | "blue" | "neutral";
@@ -26,7 +26,10 @@ const REGISTRY: Record<string, EventMeta> = {
   TARGET_VEHICLE_FOUND: { label: "Target Vehicle Found", severity: "red", icon: Car },
   TARGET_VEHICLE_REACQUIRED: { label: "Target Vehicle Reacquired", severity: "red", icon: Car },
   TARGET_VEHICLE_LOST: { label: "Target Vehicle Lost", severity: "amber", icon: Car },
-  ZONE_ENTRY: { label: "Zone Entry", severity: "amber", icon: MapPin },
+  // The warning that precedes an intrusion: amber, because it has not
+  // happened yet. The crossing itself is red and sounds the siren.
+  ZONE_APPROACH: { label: "Approaching Zone", severity: "amber", icon: Navigation },
+  ZONE_ENTRY: { label: "Zone Intrusion", severity: "red", icon: ShieldAlert },
   ZONE_EXIT: { label: "Zone Exit", severity: "green", icon: MapPinOff },
   LONG_DWELL: { label: "Long Dwell", severity: "amber", icon: Clock },
   TARGET_ZONE_INTRUSION: { label: "Target Zone Intrusion", severity: "red", icon: ShieldAlert },

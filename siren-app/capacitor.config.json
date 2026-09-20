@@ -1,6 +1,6 @@
 {
   "appId": "in.borderwatch.siren",
-  "appName": "Border-Watch Siren",
+  "appName": "Drishti Siren",
   "webDir": "www",
   "android": {
     "allowMixedContent": true

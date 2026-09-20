@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* BorderWatch design tokens - dark, tactical, restrained.
+/* Drishti design tokens - dark, tactical, restrained.
    Color is semantic: red=threat/target, amber=warning, green=healthy,
    blue=information/active, white=primary text. No neon, no decorative gradients. */
 @theme {

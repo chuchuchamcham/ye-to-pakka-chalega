@@ -14,7 +14,7 @@ from typing import Callable
 
 from backend.config import TrackerConfig, ZoneConfig
 from backend.core.output import (
-    GREEN, ORANGE, OutputVideoWriter, draw_banner, draw_polygon,
+    GREEN, ORANGE, OutputVideoWriter, RED, draw_banner, draw_polygon,
     draw_target_box, format_timestamp,
 )
 from backend.core.tracker import ObjectTracker
@@ -22,7 +22,10 @@ from backend.core.video import VideoInfo, VideoReader
 from backend.modules.zone.geometry import Zone, centroid, denormalize_polygon, footpoint
 from backend.modules.zone.state import INSIDE, ZoneMonitor
 
-_BANNER_COLOR = {"ZONE_ENTRY": ORANGE, "ZONE_EXIT": GREEN, "LONG_DWELL": (0, 0, 200)}
+_BANNER_COLOR = {
+    "ZONE_APPROACH": ORANGE, "ZONE_ENTRY": RED, "ZONE_EXIT": GREEN,
+    "LONG_DWELL": (0, 0, 200),
+}
 
 
 @dataclass
@@ -48,6 +51,10 @@ class ZoneResult:
     entries: int
     exits: int
     dwell_events: int
+    # Predicted intrusions that were warned about before the boundary was
+    # crossed. Reported separately from entries because a warning is not an
+    # incident - it is the chance to prevent one.
+    approaches: int
     track_summaries: list[TrackSummary]
 
 
@@ -81,6 +88,11 @@ class ZonePipeline:
             exit_grace_frames=cfg.exit_grace_frames,
             track_absence_grace_frames=cfg.track_absence_grace_frames,
             dwell_threshold_sec=cfg.dwell_threshold_sec,
+            approach_prediction_sec=cfg.approach_prediction_sec,
+            approach_grace_frames=cfg.approach_grace_frames,
+            approach_min_speed_px_per_sec=cfg.approach_min_speed_px_per_sec,
+            approach_velocity_window_sec=cfg.approach_velocity_window_sec,
+            approach_cooldown_sec=cfg.approach_cooldown_sec,
         )
 
         norm_polygon = zone.normalized_polygon()
@@ -104,7 +116,15 @@ class ZonePipeline:
                 monitor.update(points, frame.index, frame.timestamp_sec, polygon_px)
                 new_events = monitor.events[n_before:]
 
-                draw_polygon(frame.image, polygon_px, label=zone.label or "RESTRICTED ZONE")
+                label = zone.label or "RESTRICTED ZONE"
+                breached = any(monitor.state_of(tid) == INSIDE for tid in tracks_by_id)
+                nearing = not breached and any(monitor.approaching(tid) for tid in tracks_by_id)
+                if breached:
+                    draw_polygon(frame.image, polygon_px, label=f"{label} - INTRUSION", color=RED)
+                elif nearing:
+                    draw_polygon(frame.image, polygon_px, label=f"{label} - APPROACH", color=ORANGE)
+                else:
+                    draw_polygon(frame.image, polygon_px, label=label)
 
                 for tid, t in tracks_by_id.items():
                     if monitor.state_of(tid) == INSIDE:
@@ -113,13 +133,23 @@ class ZonePipeline:
 
                 for ev in new_events:
                     cname = self._class_name(track_class.get(ev.track_id, -1))
-                    if ev.type == "ZONE_ENTRY":
-                        lines = ["ZONE ENTRY", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)]
+                    if ev.type == "ZONE_APPROACH":
+                        eta = ev.data.get("eta_sec")
+                        detail = f"Predicted entry in {eta}s" if eta else "Predicted entry"
+                        lines = ["APPROACHING ZONE", f"{cname} #{ev.track_id}", detail]
+                    elif ev.type == "ZONE_ENTRY":
+                        lines = ["ZONE INTRUSION", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)]
                     elif ev.type == "ZONE_EXIT":
                         lines = ["ZONE EXIT", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)]
-                    else:  # LONG_DWELL
-                        lines = ["LONG DWELL", f"{cname} #{ev.track_id}", f"Duration: {ev.data['duration_sec']:.1f} sec"]
-                    active_banners.append((lines, _BANNER_COLOR[ev.type], frame.index + banner_frames))
+                    elif ev.type == "LONG_DWELL":
+                        lines = ["LONG DWELL", f"{cname} #{ev.track_id}",
+                                 f"Duration: {ev.data.get('duration_sec', 0.0):.1f} sec"]
+                    else:
+                        # An event type this pipeline does not draw is not a
+                        # reason to abandon the run and lose the output video.
+                        continue
+                    active_banners.append((lines, _BANNER_COLOR.get(ev.type, ORANGE),
+                                           frame.index + banner_frames))
 
                 active_banners = [b for b in active_banners if b[2] > frame.index]
                 for slot, (lines, color, _expire) in enumerate(active_banners):
@@ -141,6 +171,7 @@ class ZonePipeline:
         entries = sum(1 for e in monitor.events if e.type == "ZONE_ENTRY")
         exits = sum(1 for e in monitor.events if e.type == "ZONE_EXIT")
         dwells = sum(1 for e in monitor.events if e.type == "LONG_DWELL")
+        approaches = sum(1 for e in monitor.events if e.type == "ZONE_APPROACH")
 
         summaries: dict[int, TrackSummary] = {}
         for e in monitor.events:
@@ -167,5 +198,6 @@ class ZonePipeline:
             entries=entries,
             exits=exits,
             dwell_events=dwells,
+            approaches=approaches,
             track_summaries=list(summaries.values()),
         )

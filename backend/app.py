@@ -1,4 +1,4 @@
-"""BorderWatch API - thin HTTP layer over the module pipelines.
+"""Drishti API - thin HTTP layer over the module pipelines.
 
 Two job creation paths:
   - POST /api/zone-jobs: the original Phase 3 zone-only job (kept exactly
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     camera_manager.stop_all()
 
 
-app = FastAPI(title="BorderWatch API", lifespan=lifespan)
+app = FastAPI(title="Drishti API", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(live_router)
 

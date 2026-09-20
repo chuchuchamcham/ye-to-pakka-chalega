@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Border-Watch Siren</title>
+<title>Drishti Siren</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -62,7 +62,7 @@
 </head>
 <body>
   <header>
-    <span class="brand">Border-Watch &middot; Post Siren</span>
+    <span class="brand">Drishti &middot; Post Siren</span>
     <span class="conn"><span class="dot" id="dot"></span><span id="conn">not connected</span></span>
   </header>
 
@@ -70,7 +70,7 @@
     <!-- Setup: asked once, then remembered. The address is entered rather than
          compiled in, so a server whose IP changes does not need a new build. -->
     <div id="setup" class="field" hidden>
-      <div class="state">Connect to Border-Watch</div>
+      <div class="state">Connect to Drishti</div>
       <label for="host">Server address shown on the dashboard's Connect Device page</label>
       <input id="host" inputmode="url" autocapitalize="off" autocorrect="off"
              placeholder="192.168.0.166:8000">
@@ -81,7 +81,7 @@
     <div id="runtime" hidden>
       <div class="state" id="state">Siren disarmed</div>
       <h1 class="headline" id="headline">Tap to arm</h1>
-      <p class="sub" id="sub">This phone will sound whenever Border-Watch raises a high-priority alert.</p>
+      <p class="sub" id="sub">This phone will sound whenever Drishti raises a high-priority alert.</p>
       <div id="badgeWrap"></div>
       <div style="height:14px"></div>
       <button class="primary" id="armBtn">Arm siren</button>

@@ -12,14 +12,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from backend.modules.zone.geometry import point_in_polygon
+from math import hypot
+
+from backend.modules.zone.geometry import (
+    point_in_polygon, predicted_entry_eta, velocity_from,
+)
 
 UNKNOWN, OUTSIDE, INSIDE = "UNKNOWN", "OUTSIDE", "INSIDE"
 
 
 @dataclass
 class ZoneEvent:
-    type: str  # ZONE_ENTRY | ZONE_EXIT | LONG_DWELL
+    type: str  # ZONE_APPROACH | ZONE_ENTRY | ZONE_EXIT | LONG_DWELL
     zone_id: str
     track_id: int
     frame_index: int
@@ -35,6 +39,12 @@ class _TrackState:
     absence_count: int = 0
     entry_ts: float | None = None
     dwell_emitted: bool = False
+    # Recent (timestamp, point) samples, used to estimate heading for the
+    # approach prediction. Bounded by elapsed time rather than sample count,
+    # so it spans the same amount of real motion at any frame rate.
+    history: list[tuple[float, tuple[float, float]]] = field(default_factory=list)
+    approach_pending: int = 0
+    approach_warned_ts: float | None = None
 
 
 class ZoneMonitor:
@@ -45,12 +55,24 @@ class ZoneMonitor:
         exit_grace_frames: int = 15,
         track_absence_grace_frames: int = 45,
         dwell_threshold_sec: float = 15.0,
+        approach_prediction_sec: float = 2.5,
+        approach_grace_frames: int = 2,
+        approach_min_speed_px_per_sec: float = 12.0,
+        approach_velocity_window_sec: float = 1.5,
+        approach_cooldown_sec: float = 20.0,
     ):
         self.zone_id = zone_id
         self.entry_grace_frames = max(1, entry_grace_frames)
         self.exit_grace_frames = max(1, exit_grace_frames)
         self.track_absence_grace_frames = max(1, track_absence_grace_frames)
         self.dwell_threshold_sec = dwell_threshold_sec
+        # A horizon of 0 turns prediction off entirely, which is the right
+        # behaviour for a camera where approach warnings are unwanted.
+        self.approach_prediction_sec = max(0.0, approach_prediction_sec)
+        self.approach_grace_frames = max(1, approach_grace_frames)
+        self.approach_min_speed_px_per_sec = max(0.0, approach_min_speed_px_per_sec)
+        self.approach_velocity_window_sec = max(0.1, approach_velocity_window_sec)
+        self.approach_cooldown_sec = max(0.0, approach_cooldown_sec)
         self._tracks: dict[int, _TrackState] = {}
         self.events: list[ZoneEvent] = []
 
@@ -97,6 +119,7 @@ class ZoneMonitor:
                     st.pending_inside = 0
                     if st.state == UNKNOWN:
                         st.state = OUTSIDE  # safe immediate default, no event
+                    self._check_approach(tid, st, point, frame_index, timestamp_sec, polygon)
             else:
                 if inside:
                     st.pending_outside = 0
@@ -114,8 +137,70 @@ class ZoneMonitor:
                             {"duration_sec": round(dwell, 3)},
                         ))
 
+    def _check_approach(self, tid: int, st: _TrackState, point: tuple[float, float],
+                        frame_index: int, ts: float,
+                        polygon: list[tuple[float, float]]) -> None:
+        """Warn when this track's recent heading points into the zone.
+
+        Only ever raised for a track that is currently outside: once it is in,
+        the crossing alarm is the truth and a prediction about it is noise.
+        """
+        if self.approach_prediction_sec <= 0:
+            return
+
+        # A long enough gap means this track was absent, and where it stood
+        # before that says nothing about where it is heading now - so the
+        # baseline starts again rather than measuring across the gap. The
+        # threshold is deliberately longer than the window itself: at live
+        # frame rates one ordinary frame interval can approach the window's
+        # length, and treating that as an absence would clear the history on
+        # every frame and leave the heading permanently unmeasurable.
+        absence_gap = self.approach_velocity_window_sec * 2.0
+        if st.history and ts - st.history[-1][0] > absence_gap:
+            st.history.clear()
+        st.history.append((ts, point))
+        while len(st.history) > 2 and ts - st.history[0][0] > self.approach_velocity_window_sec:
+            st.history.pop(0)
+
+        velocity = velocity_from(st.history)
+        speed = hypot(*velocity) if velocity else 0.0
+        eta = None
+        if speed >= self.approach_min_speed_px_per_sec:
+            eta = predicted_entry_eta(point, velocity, polygon, self.approach_prediction_sec)
+
+        if eta is None:
+            st.approach_pending = 0
+            return
+
+        st.approach_pending += 1
+        if st.approach_pending < self.approach_grace_frames:
+            return
+        if (st.approach_warned_ts is not None
+                and ts - st.approach_warned_ts < self.approach_cooldown_sec):
+            return
+
+        st.approach_warned_ts = ts
+        st.approach_pending = 0
+        self.events.append(ZoneEvent(
+            "ZONE_APPROACH", self.zone_id, tid, frame_index, ts,
+            {"eta_sec": eta, "speed_px_per_sec": round(speed, 1)},
+        ))
+
+    def approaching(self, track_id: int) -> bool:
+        """Whether this track is under a live approach warning - lets the UI
+        show a zone's status without replaying its event history."""
+        st = self._tracks.get(track_id)
+        if st is None or st.approach_warned_ts is None or st.state == INSIDE:
+            return False
+        latest = st.history[-1][0] if st.history else st.approach_warned_ts
+        return latest - st.approach_warned_ts <= self.approach_prediction_sec
+
     def _commit_entry(self, tid: int, st: _TrackState, frame_index: int, ts: float) -> None:
         st.state = INSIDE
+        # The prediction has been overtaken by events. Clearing it means
+        # leaving and returning counts as a fresh approach, not a stale one.
+        st.approach_pending = 0
+        st.history.clear()
         st.entry_ts = ts
         st.dwell_emitted = False
         st.pending_inside = 0
@@ -127,6 +212,8 @@ class ZoneMonitor:
         st.pending_outside = 0
         st.absence_count = 0
         st.entry_ts = None
+        st.approach_pending = 0
+        st.history.clear()
         self.events.append(ZoneEvent(
             "ZONE_EXIT", self.zone_id, tid, frame_index, ts,
             {"dwell_duration_sec": round(dwell, 3)},

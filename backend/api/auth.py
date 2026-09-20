@@ -1,4 +1,4 @@
-"""Authentication and role-based access for the Border-Watch API.
+"""Authentication and role-based access for the Drishti API.
 
 Until now any device on the network could view every camera, add cameras, or
 delete evidence. That is survivable on localhost and unacceptable the moment

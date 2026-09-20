@@ -1,4 +1,4 @@
-"""Start Border-Watch for real use: one command, both protocols.
+"""Start Drishti for real use: one command, both protocols.
 
 Two listeners are needed at once, for reasons that are not arbitrary:
 

@@ -91,7 +91,9 @@ def test_full_zone_workflow_through_the_api():
     events = resp.json()
     assert isinstance(events, list)
     for e in events:
-        assert e["type"] in ("ZONE_ENTRY", "ZONE_EXIT", "LONG_DWELL")
+        # ZONE_APPROACH is the early warning raised before a boundary is
+        # crossed; it travels the same path as the other zone events.
+        assert e["type"] in ("ZONE_APPROACH", "ZONE_ENTRY", "ZONE_EXIT", "LONG_DWELL")
         assert e["zone_id"] == zone_id
 
     # 7) output video - fetch and verify it's a real, complete, playable file

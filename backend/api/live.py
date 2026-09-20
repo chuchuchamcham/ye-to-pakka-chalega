@@ -383,7 +383,7 @@ async def ingest_websocket(websocket: WebSocket, camera_id: str):
         logger.info("phone ingest closed for %s: %d frames, %d rejected", camera_id, received, rejected)
 
 
-APK_PATH = Path(__file__).resolve().parent.parent.parent / "dist" / "BorderWatch-Siren.apk"
+APK_PATH = Path(__file__).resolve().parent.parent.parent / "dist" / "Drishti-Siren.apk"
 
 
 @router.get("/siren-app", include_in_schema=False)
@@ -398,7 +398,7 @@ def download_siren_apk() -> FileResponse:
         raise HTTPException(404, "the Android app has not been built - see siren-app/README")
     return FileResponse(
         APK_PATH, media_type="application/vnd.android.package-archive",
-        filename="BorderWatch-Siren.apk",
+        filename="Drishti-Siren.apk",
     )
 
 

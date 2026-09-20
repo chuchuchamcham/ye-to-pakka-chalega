@@ -19,8 +19,13 @@ siren-app/android/.idea/
 # Runtime / generated data (job outputs, uploads, per-job artifacts)
 jobs/
 outputs/
-references/
 zones/
+
+# Enrolled reference photos are biometric data and stay out of the repo -
+# except the demo enrolment that ships with the demo clip, without which the
+# built-in perimeter camera has nobody to look for.
+references/*
+!references/smoke_target/
 
 # Uploaded footage is runtime data, except the small demo clips the two
 # built-in cameras run on - without them a fresh clone has no cameras.

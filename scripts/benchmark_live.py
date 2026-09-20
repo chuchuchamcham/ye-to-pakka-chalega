@@ -145,7 +145,7 @@ def main() -> int:
         print(f"missing test footage: {PERSON_CLIP}")
         return 1
 
-    print("Border-Watch live performance - measured, CPU only")
+    print("Drishti live performance - measured, CPU only")
     print(f"sample length: {seconds:.0f}s per configuration")
     print("NOTE: cameras capture at 12fps by design, so any figure at ~12 is")
     print("      hitting that ceiling rather than the CPU. Only results below")

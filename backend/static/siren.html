@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Border-Watch Siren</title>
+<title>Drishti Siren</title>
 <link rel="manifest" href="/api/live/siren/manifest.webmanifest">
 <meta name="theme-color" content="#0a0f16">
 <meta name="mobile-web-app-capable" content="yes">
@@ -75,7 +75,7 @@
 </head>
 <body>
   <header>
-    <span class="brand">Border-Watch &middot; Post Siren</span>
+    <span class="brand">Drishti &middot; Post Siren</span>
     <span class="conn"><span class="dot" id="dot"></span><span id="conn">connecting</span></span>
   </header>
 
@@ -171,7 +171,7 @@
     if (!armed) return;
     $("state").textContent = "Siren armed";
     $("headline").textContent = "Monitoring";
-    $("sub").textContent = "This device will sound on any high-priority alert from Border-Watch.";
+    $("sub").textContent = "This device will sound on any high-priority alert from Drishti.";
   }
 
   async function arm() {

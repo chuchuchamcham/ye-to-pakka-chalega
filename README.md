@@ -1,4 +1,4 @@
-# BorderWatch — AI Video Intelligence for Border Surveillance
+# Drishti — AI Video Intelligence for Border Surveillance
 
 Live video analytics on **existing CCTV infrastructure**, built for SIH 2026
 (PS #26187, MHA/SSB). Runs on an ordinary CPU — no GPU required.
@@ -15,7 +15,7 @@ Two modes, one analysis pipeline:
 |---|---|
 | **Target Person ID** | A specific person, from 1–6 reference photos. Face recognition confirms identity; appearance ReID keeps the lock when the face turns away. |
 | **ANPR** | Reads number plates, confirms them across multiple frames, and raises an alarm on a watchlist match. |
-| Zone Intrusion | Someone entering a drawn restricted area. |
+| **Restricted Zone** | Warns while someone is still *heading for* a boundary, by extrapolating their track, then sounds the siren when they actually cross it. |
 | Behaviour Analytics | Loitering, pacing, sudden direction changes, abnormal speed. |
 | Low-Light | Enhances dark footage before analysis. |
 
@@ -59,8 +59,27 @@ Add your own camera with any RTSP URL or a video file path. To use a phone as
 a camera, open **Connect Device** — that page needs HTTPS, which
 `scripts/make_dev_cert.py` sets up on port 8443.
 
+- **CAM-01's restricted zone** is already drawn across the walkway. Watch the
+  outline: it turns amber and logs `ZONE_APPROACH` while someone is still
+  heading for it, then red with the siren on `ZONE_ENTRY` when they cross.
+
+Both cameras start with their analysis already armed, so Live Monitor has
+something to show the moment it boots.
+
 Forensic mode: **Analysis** → upload a video → pick modules → **Results**. The
 siren sounds as playback reaches each alert, not when the job finishes.
+
+### Tuning the zone warning
+
+Every threshold is in `ZoneConfig` (`backend/config.py`):
+
+| Setting | Default | Effect |
+|---|---|---|
+| `approach_prediction_sec` | 2.5 | How far ahead to predict. `0` disables warnings, leaving crossings alone. |
+| `approach_grace_frames` | 2 | Frames the prediction must agree before warning. |
+| `approach_min_speed_px_per_sec` | 12.0 | Below this is tracker jitter, not approach. |
+| `approach_velocity_window_sec` | 1.5 | Baseline for measuring heading. Must exceed the gap between analysed frames. |
+| `approach_cooldown_sec` | 20.0 | Minimum gap before the same track warns again. |
 
 ```bash
 pytest backend/tests -q      # 248 tests

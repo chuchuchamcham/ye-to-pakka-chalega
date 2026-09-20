@@ -6,7 +6,7 @@ import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * Border-Watch Post Siren.
+ * Drishti Post Siren.
  *
  * This phone is an appliance, not a browsing session: it sits at a post and
  * its only job is to be listening when an alert arrives. Two things follow

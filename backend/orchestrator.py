@@ -36,7 +36,7 @@ from backend.config import (
 )
 from backend.core.lowlight import process_frame as lowlight_process_frame
 from backend.core.output import (
-    CYAN, MAGENTA, ORANGE, OutputVideoWriter, draw_banner, draw_polygon,
+    CYAN, MAGENTA, ORANGE, OutputVideoWriter, RED, draw_banner, draw_polygon,
     draw_target_box, format_timestamp,
 )
 from backend.core.target_lock import TargetLock
@@ -288,7 +288,21 @@ class CombinedPipeline:
                 )
 
         # --- zone state (multiple zones supported) ---
-        zone_monitors = [ZoneMonitor(z.zone_id, self.zone_cfg.entry_grace_frames, self.zone_cfg.exit_grace_frames, self.zone_cfg.track_absence_grace_frames, self.zone_cfg.dwell_threshold_sec) for z in req.zones]
+        zone_monitors = [
+            ZoneMonitor(
+                z.zone_id,
+                entry_grace_frames=self.zone_cfg.entry_grace_frames,
+                exit_grace_frames=self.zone_cfg.exit_grace_frames,
+                track_absence_grace_frames=self.zone_cfg.track_absence_grace_frames,
+                dwell_threshold_sec=self.zone_cfg.dwell_threshold_sec,
+                approach_prediction_sec=self.zone_cfg.approach_prediction_sec,
+                approach_grace_frames=self.zone_cfg.approach_grace_frames,
+                approach_min_speed_px_per_sec=self.zone_cfg.approach_min_speed_px_per_sec,
+                approach_velocity_window_sec=self.zone_cfg.approach_velocity_window_sec,
+                approach_cooldown_sec=self.zone_cfg.approach_cooldown_sec,
+            )
+            for z in req.zones
+        ]
         zone_polygons_px: list[list[tuple[int, int]]] = []
 
         # --- behavior state ---
@@ -586,12 +600,15 @@ class CombinedPipeline:
                             new_events = monitor.events[n_before:]
                             for ev in new_events:
                                 d = {"event_id": next_event_id(), "type": ev.type, "track_id": ev.track_id, "frame_index": ev.frame_index, "timestamp_sec": ev.timestamp_sec, "zone": zone.zone_id, "data": ev.data}
-                                if ev.type in ("ZONE_ENTRY", "ZONE_EXIT", "LONG_DWELL"):
+                                if ev.type in ("ZONE_APPROACH", "ZONE_ENTRY", "ZONE_EXIT", "LONG_DWELL"):
                                     d["evidence_path"] = save_evidence(frame.image, ev.track_id, ev.type, frame.index, tracks_by_id[ev.track_id].bbox if ev.track_id in tracks_by_id else None)
                                 all_events.append(d)
                                 cname = "VEHICLE" if track_class.get(ev.track_id) in self.tracker_config.vehicle_class_ids else "PERSON"
-                                if ev.type == "ZONE_ENTRY":
-                                    active_banners.append((["ZONE ENTRY", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)], ORANGE, frame.index + banner_frames))
+                                if ev.type == "ZONE_APPROACH":
+                                    eta = ev.data.get("eta_sec")
+                                    active_banners.append((["APPROACHING ZONE", f"{cname} #{ev.track_id}", f"Predicted entry in {eta}s" if eta else "Predicted entry"], ORANGE, frame.index + banner_frames))
+                                elif ev.type == "ZONE_ENTRY":
+                                    active_banners.append((["ZONE INTRUSION", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)], RED, frame.index + banner_frames))
                                 elif ev.type == "ZONE_EXIT":
                                     active_banners.append((["ZONE EXIT", f"{cname} #{ev.track_id}", format_timestamp(ev.timestamp_sec)], (60, 200, 60), frame.index + banner_frames))
                                 elif ev.type == "LONG_DWELL":
@@ -624,8 +641,16 @@ class CombinedPipeline:
                             active_banners.append((lines, _BEHAVIOR_BANNER_COLOR[ev.type], frame.index + banner_frames))
 
                     # ---------------- annotation ----------------
-                    for polygon_px, zone in zip(zone_polygons_px, req.zones):
-                        draw_polygon(frame.image, polygon_px, label=zone.label or "RESTRICTED ZONE")
+                    for polygon_px, zone, monitor in zip(zone_polygons_px, req.zones, zone_monitors):
+                        breached = any(monitor.state_of(tid) == INSIDE for tid in tracks_by_id)
+                        nearing = not breached and any(monitor.approaching(tid) for tid in tracks_by_id)
+                        label = zone.label or "RESTRICTED ZONE"
+                        if breached:
+                            draw_polygon(frame.image, polygon_px, label=f"{label} - INTRUSION", color=RED)
+                        elif nearing:
+                            draw_polygon(frame.image, polygon_px, label=f"{label} - APPROACH", color=ORANGE)
+                        else:
+                            draw_polygon(frame.image, polygon_px, label=label)
 
                     drawn: set[int] = set()
                     if person_target_bbox is not None:

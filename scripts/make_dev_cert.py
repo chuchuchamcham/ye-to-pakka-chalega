@@ -84,7 +84,7 @@ def main() -> int:
     # only against subjectAltName, so every address the phone might dial has to
     # be listed here or the certificate is rejected outright.
     alt_names = ["DNS:localhost", "IP:127.0.0.1"] + [f"IP:{ip}" for ip in ips]
-    subject = "/C=IN/O=Border-Watch/CN=border-watch.local"
+    subject = "/C=IN/O=Drishti/CN=border-watch.local"
 
     cmd = [
         openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256",

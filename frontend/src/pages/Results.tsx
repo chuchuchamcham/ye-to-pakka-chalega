@@ -133,7 +133,7 @@ export function Results() {
   if (loadError) return <PageShell><ErrorState message={loadError} /></PageShell>;
   if (!events || !evidence) return <PageShell><LoadingBlock label="Loading events and evidence…" /></PageShell>;
 
-  const title = summary?.person_id ? "Target Person Identification" : "BorderWatch Analysis Results";
+  const title = summary?.person_id ? "Target Person Identification" : "Drishti Analysis Results";
 
   return (
     <>

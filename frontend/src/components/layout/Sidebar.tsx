@@ -76,7 +76,7 @@ export function Sidebar({ user, onSignedOut }: { user?: SessionUser | null; onSi
       <div className="mb-4 border-b border-border-1 px-5 pb-5">
         <div className="flex items-center gap-2 text-lg font-bold tracking-wide text-text-primary">
           <span className="h-2 w-2 shrink-0 rounded-full bg-accent-blue shadow-[0_0_8px_var(--color-accent-blue)]" />
-          BORDERWATCH
+          DRISHTI
         </div>
         <div className="mt-1 pl-4 text-[11px] tracking-[1.5px] text-text-tertiary">AI VIDEO INTELLIGENCE</div>
       </div>

@@ -122,7 +122,7 @@ export function Analysis() {
 
   return (
     <>
-      <PageHeader title="New Analysis" subtitle="Configure and launch a BorderWatch video analysis" />
+      <PageHeader title="New Analysis" subtitle="Configure and launch a Drishti video analysis" />
       <PageBody narrow>
         <StepIndicator current={step} />
 
@@ -201,7 +201,7 @@ export function Analysis() {
                   maxLength={20}
                 />
                 <p className="mt-2 text-[11.5px] text-text-tertiary">
-                  BorderWatch will search confirmed plate observations in the uploaded video. Leave blank to run general ANPR without searching for a specific plate.
+                  Drishti will search confirmed plate observations in the uploaded video. Leave blank to run general ANPR without searching for a specific plate.
                 </p>
               </Panel>
             )}

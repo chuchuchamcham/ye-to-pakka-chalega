@@ -25,7 +25,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from backend.config import AnprConfig, BehaviorConfig, EVENT_DB_PATH, EVIDENCE_DIR, PersonIDConfig
+from backend.config import (
+    AnprConfig, BehaviorConfig, EVENT_DB_PATH, EVIDENCE_DIR, PersonIDConfig,
+    REFERENCES_DIR,
+)
+from backend.modules.zone.geometry import Zone
 from backend.core.events import ALARM_SEVERITIES, describe_event, severity_for
 from backend.core.video import (
     DEFAULT_MAX_ANALYSIS_WIDTH, LiveStreamReader, OFFLINE, ONLINE, PUSH_SCHEME,
@@ -810,6 +814,47 @@ DEMO_CAMERAS = (
     ("cam-02", "CAM-02", "smoke_anpr_test123.mp4", "Vehicle Checkpoint - Gate 2"),
 )
 
+# The enrolment the demo person_id camera searches for, shipped with the demo
+# clip it belongs to.
+DEMO_REFERENCE_SET = "smoke_target"
+
+# A restricted area on the demo perimeter camera: a band across the walkway
+# the subjects approach from below and then cross, which is what makes both
+# halves of the rule visible - the warning first, the siren after. Placed
+# from the clip's actual tracks rather than by eye, because a zone people
+# already start inside can only ever show the crossing. Normalized, so it
+# lines up whatever resolution the clip is analysed at.
+DEMO_ZONE_POINTS = [(0.25, 0.45), (0.60, 0.65)]
+
+
+def demo_analysis_for(camera_id: str) -> AnalysisSpec | None:
+    """The analysis a demo camera starts with.
+
+    Demo cameras arrive already watching for something. Left unarmed they
+    stream video and detect nothing, which reads as a broken system to anyone
+    opening Live Monitor for the first time - and the one thing they would
+    need in order to arm person_id themselves, a photo of someone in the clip,
+    is the one thing they do not have. Returns None when the enrolment is
+    missing, so a deployment that removed it still starts cleanly.
+    """
+    if camera_id == "cam-01":
+        reference_dir = REFERENCES_DIR / DEMO_REFERENCE_SET
+        photos = sorted(reference_dir.glob("*.jpg")) if reference_dir.is_dir() else []
+        if not photos:
+            return None
+        return AnalysisSpec(
+            person_id=True,
+            reference_photo_paths=list(photos),
+            reference_set_id=DEMO_REFERENCE_SET,
+            zones=[Zone(
+                zone_id="demo-zone-cam-01", video_id="cam-01",
+                label="RESTRICTED ZONE", shape="rectangle", points=DEMO_ZONE_POINTS,
+            )],
+        )
+    if camera_id == "cam-02":
+        return AnalysisSpec(anpr=True, target_plate="TEST123")
+    return None
+
 
 def seed_demo_cameras(uploads_dir, manager: CameraManager | None = None,
                       autostart: bool = True) -> list[Camera]:
@@ -824,6 +869,7 @@ def seed_demo_cameras(uploads_dir, manager: CameraManager | None = None,
             continue
         camera = manager.add(
             name=name, source=str(path), loop=True, location=location, camera_id=camera_id,
+            analysis=demo_analysis_for(camera_id),
         )
         if autostart:
             manager.get(camera.camera_id).start()
